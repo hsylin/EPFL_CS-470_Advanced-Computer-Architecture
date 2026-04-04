@@ -33,7 +33,10 @@ void latch(State& curr, const State& next, View& view, CycleContext& cycle_conte
 
 bool no_inflight_work(const State& curr, const execution_stage& execution)
 {
-    return curr.decoded_instruction_register.size() == 0
+    const bool stale_exception_dir =
+        curr.program_counter.get() == EXCEPTION_VECTOR;
+
+    return (stale_exception_dir || curr.decoded_instruction_register.size() == 0)
         && curr.integer_queue.empty()
         && curr.active_list.empty()
         && execution.empty();

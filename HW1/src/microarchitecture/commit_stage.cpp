@@ -24,12 +24,13 @@ void commit_stage::apply_forwarding_results(
 
 void commit_stage::retire_front_instruction(View& view, State& next) const
 {
-    const auto freed_physical_register = view.active_list.front().value().old_destination;
+    const auto freed_physical_register =
+        view.active_list.front().value().old_destination;
+
     view.free_list.push(freed_physical_register);
     next.busy_bit_table.set(freed_physical_register, false);
     view.active_list.pop_front();
 }
-
 
 void commit_stage::roll_back_instruction(
     const State& curr,
@@ -42,6 +43,7 @@ void commit_stage::roll_back_instruction(
     next.exception_flag.set_exception_mode(true);
 
     cycle_context.request_halt_fetch_decode();
+    cycle_context.request_halt_rename_dispatch();
     cycle_context.request_execution_reset();
     cycle_context.request_integer_queue_reset();
 
@@ -57,6 +59,7 @@ void commit_stage::roll_back_instruction(
 
         view.free_list.push(speculative_destination);
         next.busy_bit_table.set(speculative_destination, false);
+
         next.register_map_table.set_physical_register(
             logical_destination,
             youngest_entry.old_destination
@@ -65,10 +68,6 @@ void commit_stage::roll_back_instruction(
         view.active_list.pop_back();
         ++rollback_count;
     }
-
-    // Do not clear exception mode here.
-    // The reference behavior keeps Exception=true for the cycle in which
-    // the Active List becomes empty, and clears it on the next cycle.
 }
 
 void commit_stage::propagate(
@@ -80,8 +79,8 @@ void commit_stage::propagate(
     if (!curr.exception_flag.is_exception_mode())
     {
         std::size_t retired_count = 0;
+        bool exception_detected = false;
 
-        // Retirement decision must be based on the beginning-of-cycle state.
         while (retired_count < 4 && retired_count < curr.active_list.size())
         {
             const auto& head_entry = curr.active_list.at(retired_count);
@@ -100,6 +99,8 @@ void commit_stage::propagate(
                 cycle_context.request_halt_rename_dispatch();
                 cycle_context.request_execution_reset();
                 cycle_context.request_integer_queue_reset();
+
+                exception_detected = true;
                 break;
             }
 
@@ -107,23 +108,25 @@ void commit_stage::propagate(
             ++retired_count;
         }
 
-        // Forwarding updates become visible in the latched state,
-        // so they affect retirement starting from the next cycle.
-        apply_forwarding_results(view, cycle_context);
+        if (!exception_detected)
+        {
+            apply_forwarding_results(view, cycle_context);
+        }
 
-    
         return;
     }
 
-    // In exception mode, quit only if the Active List is already empty
-    // at the beginning of the cycle.
     if (curr.active_list.empty())
     {
         next.exception_flag.set_exception_mode(false);
+    
+        cycle_context.request_halt_fetch_decode();
+        cycle_context.request_halt_rename_dispatch();
+        cycle_context.request_execution_reset();
+        cycle_context.request_integer_queue_reset();
+    
         return;
     }
 
     roll_back_instruction(curr, view, next, cycle_context);
 }
-
-

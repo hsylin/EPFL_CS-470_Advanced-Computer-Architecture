@@ -255,7 +255,6 @@ void fetch_and_decode_stage::propagate(const State& curr,
     if (cycle_context.is_halt_fetch_decode_requested())
     {
         next.program_counter.set(0x10000);
-        next.decoded_instruction_register.reset();
         return;
     }
 
