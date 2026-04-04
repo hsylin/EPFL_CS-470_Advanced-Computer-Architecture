@@ -1,11 +1,11 @@
 #include "register_map_table.hpp"
 
-register_map_table::register_map_table()
+RegisterMapTable::RegisterMapTable()
 {
     reset();
 }
 
-void register_map_table::reset()
+void RegisterMapTable::reset()
 {
     for (int i = 0; i < 32; i++)
     {
@@ -13,17 +13,17 @@ void register_map_table::reset()
     }
 }
 
-int register_map_table::get_physical_register(int arch_reg) const
+int RegisterMapTable::get_physical_register(int arch_reg) const
 {
     return reg_map[arch_reg];
 }
 
-void register_map_table::set_physical_register(int arch_reg, int phys_reg)
+void RegisterMapTable::set_physical_register(int arch_reg, int phys_reg)
 {
     reg_map[arch_reg] = phys_reg;
 }
 
-void register_map_table::dump(json& j) const
+void RegisterMapTable::dump(json& j) const
 {
     j["RegisterMapTable"] = json::array();
 

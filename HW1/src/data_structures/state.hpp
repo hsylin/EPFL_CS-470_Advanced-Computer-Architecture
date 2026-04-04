@@ -6,7 +6,7 @@
 #include "physical_register_file.hpp"
 #include "decoded_instruction_register.hpp"
 #include "exception_flag.hpp"
-#include "exception_pc.hpp"
+#include "exception_program_counter.hpp"
 #include "register_map_table.hpp"
 #include "free_list.hpp"
 #include "busy_bit_table.hpp"
@@ -24,7 +24,7 @@ public:
     json dump() const;
 
 public:
-    ProgramCounter pc;
+    ProgramCounter program_counter;
     PhysicalRegisterFile physical_register_file;
     DecodedInstructionRegister decoded_instruction_register;
     ExceptionFlag exception_flag;

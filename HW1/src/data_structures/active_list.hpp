@@ -21,7 +21,7 @@ public:
     ActiveList();
 
     void reset();
-
+    bool full() const;
     bool empty() const;
     std::size_t size() const;
     std::size_t available_slots() const;

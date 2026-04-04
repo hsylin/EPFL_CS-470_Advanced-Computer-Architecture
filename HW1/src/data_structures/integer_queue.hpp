@@ -5,23 +5,23 @@
 #include <optional>
 #include <string>
 #include <nlohmann/json.hpp>
+#include "instruction.hpp"
 
 using json = nlohmann::json;
 
 struct IntegerQueueEntry
 {
-    unsigned int dest_register;
-
+    int dest_register;
     bool op_a_is_ready;
-    unsigned int op_a_reg_tag;
+    int op_a_reg_tag;
     std::optional<uint64_t> op_a_value;
 
     bool op_b_is_ready;
-    unsigned int op_b_reg_tag;
+    int op_b_reg_tag;
     std::optional<uint64_t> op_b_value;
 
-    std::string op_code;
-    unsigned int pc;
+    instruction_opcode_t op_code;
+    uint64_t pc;
 };
 
 class IntegerQueue

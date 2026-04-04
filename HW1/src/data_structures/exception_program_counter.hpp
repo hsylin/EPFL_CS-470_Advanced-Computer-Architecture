@@ -1,26 +1,19 @@
-#include "exception_program_counter.hpp"
+#pragma once
 
-ExceptionPC::ExceptionPC()
-{
-    value = 0;
-}
+#include <nlohmann/json.hpp>
 
-void ExceptionPC::set(unsigned int new_value)
-{
-    value = new_value;
-}
+using json = nlohmann::json;
 
-unsigned int ExceptionPC::get() const
+class ExceptionPC
 {
-    return value;
-}
+public:
+    ExceptionPC();
 
-void ExceptionPC::reset()
-{
-    value = 0;
-}
+    void set(unsigned int value);
+    unsigned int get() const;
+    void reset();
+    void dump(json& j) const;
 
-void ExceptionPC::dump(json& j) const
-{
-    j["ExceptionPC"] = value;
-}
+private:
+    unsigned int value;
+};

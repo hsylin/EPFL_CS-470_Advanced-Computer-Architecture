@@ -9,11 +9,12 @@ void ExceptionFlag::set_exception_mode(bool mode)
 {
     exception_mode = mode;
 }
-
-bool ExceptionFlag::get() const
+bool ExceptionFlag::is_exception_mode() const
 {
     return exception_mode;
 }
+
+
 
 void ExceptionFlag::reset()
 {

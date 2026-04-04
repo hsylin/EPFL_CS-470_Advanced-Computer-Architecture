@@ -7,7 +7,7 @@ State::State()
 
 void State::reset()
 {
-    pc = pc.reset();
+    program_counter.reset();
     physical_register_file.reset();
     decoded_instruction_register.reset();
     exception_flag.reset();
@@ -23,7 +23,7 @@ json State::dump() const
 {
     json j;
 
-    pc.dump(j);
+    program_counter.dump(j);
     physical_register_file.dump(j);
     decoded_instruction_register.dump(j);
     exception_flag.dump(j);

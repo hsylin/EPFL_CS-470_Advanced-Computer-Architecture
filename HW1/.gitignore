@@ -1,0 +1,4 @@
+.DS_Store
+build-release/
+given_tests/*/user_output.json
+.DS_Store

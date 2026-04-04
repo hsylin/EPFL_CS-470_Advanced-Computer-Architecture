@@ -28,6 +28,7 @@ public:
                                bool exception,
                                unsigned int pc);
 
+                               
     std::size_t forwarding_count() const;
     const ForwardingResult& forwarding_at(std::size_t index) const;
 
@@ -35,20 +36,25 @@ public:
     // Rename/Dispatch -> Fetch/Decode
     // -------------------------
     void set_rename_backpressure(bool value);
-    bool rename_backpressure() const;
+    bool is_rename_backpressure() const;
 
     // -------------------------
-    // Commit -> same-cycle exception/control requests
+    // Commit -> exception/control requests
     // -------------------------
-    void request_exception_entry(unsigned int pc);
-    bool exception_entry_requested() const;
-    unsigned int exception_entry_pc() const;
-
+    void clear_forwarding_results();
+    
     void request_execution_reset();
-    bool execution_reset_requested() const;
+    bool is_execution_reset_requested() const;
+
+    void request_halt_fetch_decode();
+    bool is_halt_fetch_decode_requested() const;
+
+    void request_halt_rename_dispatch();
+    bool is_halt_rename_dispatch_requested() const;
+
 
     void request_integer_queue_reset();
-    bool integer_queue_reset_requested() const;
+    bool is_integer_queue_reset_requested() const;
 
 private:
     static constexpr std::size_t MAX_FORWARDING_RESULTS = 4;
@@ -57,10 +63,8 @@ private:
     std::size_t forwarding_size;
 
     bool rename_backpressure_flag;
-
-    bool exception_entry_requested_flag;
-    unsigned int exception_entry_pc_value;
-
+    bool halt_fetch_decode_flag;
+    bool halt_rename_dispatch_flag;
     bool execution_reset_flag;
     bool integer_queue_reset_flag;
 };

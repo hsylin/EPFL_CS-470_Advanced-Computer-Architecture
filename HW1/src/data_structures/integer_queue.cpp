@@ -1,5 +1,35 @@
 #include "integer_queue.hpp"
 
+#include <stdexcept>
+#include <string>
+
+namespace
+{
+std::string opcode_to_string(instruction_opcode_t op)
+{
+    switch (op)
+    {
+    case instruction_opcode_t::add:
+    case instruction_opcode_t::addi:
+        return "add";
+
+    case instruction_opcode_t::sub:
+        return "sub";
+
+    case instruction_opcode_t::mulu:
+        return "mulu";
+
+    case instruction_opcode_t::divu:
+        return "divu";
+
+    case instruction_opcode_t::remu:
+        return "remu";
+    }
+
+    throw std::runtime_error("Unknown opcode");
+}
+}
+
 IntegerQueue::IntegerQueue()
 {
     reset();
@@ -80,18 +110,18 @@ void IntegerQueue::dump(json& j) const
         obj["DestRegister"] = entry.dest_register;
 
         obj["OpAIsReady"] = entry.op_a_is_ready;
-        obj["OpARegTag"] = entry.op_a_reg_tag;
-        obj["OpAValue"] = entry.op_a_value.has_value()
-                            ? json(*entry.op_a_value)
-                            : json(nullptr);
+        obj["OpARegTag"] = entry.op_a_is_ready ? 0 : entry.op_a_reg_tag;
+        obj["OpAValue"] = entry.op_a_is_ready
+                            ? json(entry.op_a_value.value_or(0))
+                            : json(0);
 
         obj["OpBIsReady"] = entry.op_b_is_ready;
-        obj["OpBRegTag"] = entry.op_b_reg_tag;
-        obj["OpBValue"] = entry.op_b_value.has_value()
-                            ? json(*entry.op_b_value)
-                            : json(nullptr);
+        obj["OpBRegTag"] = entry.op_b_is_ready ? 0 : entry.op_b_reg_tag;
+        obj["OpBValue"] = entry.op_b_is_ready
+                            ? json(entry.op_b_value.value_or(0))
+                            : json(0);
 
-        obj["OpCode"] = entry.op_code;
+        obj["OpCode"] = opcode_to_string(entry.op_code);
         obj["PC"] = entry.pc;
 
         j["IntegerQueue"].push_back(obj);

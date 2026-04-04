@@ -5,11 +5,6 @@ ProgramCounter::ProgramCounter()
     this->value = 0;
 }
 
-ProgramCounter::~ProgramCounter()
-{
-    this->value = 0;
-}
-
 void ProgramCounter::reset()
 {
     value = 0;

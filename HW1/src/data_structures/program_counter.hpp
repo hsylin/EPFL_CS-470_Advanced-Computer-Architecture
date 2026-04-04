@@ -7,8 +7,6 @@ class ProgramCounter
 {
 public:
     ProgramCounter();
-    ~ProgramCounter();
-
     void reset();
     void increment();
     void set(unsigned int value);

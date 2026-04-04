@@ -6,70 +6,57 @@
 #include <vector>
 #include <fstream>
 #include <stdexcept>
+#include <cstdint>
 #include <nlohmann/json.hpp>
 
 #include "state.hpp"
 #include "view.hpp"
 #include "cycle_context.hpp"
+#include "program_loader.hpp"
 
-namespace fs = std::filesystem;
+#include "instruction_memory.hpp"
+#include "execution_stage.hpp"
+#include "commit_stage.hpp"
+#include "rename_and_dispatch_stage.hpp"
+#include "issue_stage.hpp"
+#include "fetch_and_decode_stage.hpp"
+
 using json = nlohmann::json;
-using program_t = std::vector<std::string>;
+constexpr std::uint64_t EXCEPTION_VECTOR = 0x10000;
 
-
-
-std::pair<std::string, std::string> parse_paths(int argc, char* argv[]) 
-{
-    if (argc != 3) 
-    {
-        std::cerr << "Usage: hw1 <input_path> <output_path>\n";
-        std::exit(-1);
-    }
-
-    std::string input_path = argv[1];
-    std::string output_path = argv[2];
-
-    if (!fs::exists(input_path)) 
-    {
-        std::cerr << "Error: Input path does not exist: " << input_path << "\n";
-        std::exit(-1);
-    }
-
-    if (!fs::is_regular_file(input_path)) 
-    {
-        std::cerr << "Error: Input path is not a regular file: " << input_path << "\n";
-        std::exit(-1);
-    }
-
-    return 
-    {
-        fs::absolute(input_path).string(),
-        fs::absolute(output_path).string()
-    };
-}
-
-
-
-
-
-program_t parse_instructions(const std::string& path) {
-    json j = json::parse(std::ifstream(path));
-
-    program_t program;
-    program.reserve(j.size());
-
-    for (const auto& x : j) {
-        program.push_back(x.get<std::string>());
-    }
-
-    return program;
-}
-
-
-void latch(State& curr, const State& next)
+void latch(State& curr, const State& next, View& view, CycleContext& cycle_context)
 {
     curr = next;
+    view.load_from_state(curr);
+    cycle_context.clear();
 }
+
+bool no_inflight_work(const State& curr, const execution_stage& execution)
+{
+    return curr.decoded_instruction_register.size() == 0
+        && curr.integer_queue.empty()
+        && curr.active_list.empty()
+        && execution.empty();
+}
+
+
+bool simulation_done(const State& curr, std::size_t program_size, const execution_stage& execution)
+{
+    if (curr.exception_flag.is_exception_mode())
+    {
+        return false;
+    }
+
+    return curr.program_counter.get() >= program_size &&
+           no_inflight_work(curr, execution);
+}
+
+
+
+
+
+
+
 
 void save_log(const json& log, const std::string& output_path)
 {
@@ -95,20 +82,30 @@ int main(int argc, char* argv[])
     CycleContext cycle_context;
     json log = json::array();
 
+    execution_stage execution;
+    commit_stage commit;
+    rename_and_dispatch_stage rename_dispatch;
+    issue_stage issue;
+    fetch_and_decode_stage fetch_decode;
+
     
     // 0. parse JSON to get the program
     auto program = parse_instructions(input_path);
+    const std::size_t program_size = program.size();
+    instruction_memory imem(std::move(program));
 
     // 1. dump the state of the reset system
     log.push_back(curr.dump());
 
-    // 2. the loop for cycle-by-cycle iterations.
-    while(not (no_instruction() and active_list_is_empty()))
+
+
+    // 2. cycle-by-cycle simulation
+    while (!simulation_done(curr, program_size, execution))
     {
+        // prepare next-state working copies for this cycle
         next = curr;
         view.load_from_state(curr);
         cycle_context.clear();
-
 
        // do propagation
        // Propagation uses four layers of state:
@@ -138,41 +135,35 @@ int main(int argc, char* argv[])
        // - Commit is before Fetch/Decode because when Commit detects an exception,
        //   Fetch/Decode should "set the PC to 0x10000" and clear the DIR "on the same cycle".
        //
-       // - Commit is placed before Issue here so that exception entry and queue reset
-       //   take priority over normal downstream behavior: in Exception Mode, the Commit
-       //   stage should "Reset the Integer Queue and the Execution stage" and should
-       //   "Notify the Fetch and Decode stage that no instruction should be decoded
-       //   and supplied during the Exception Mode".
-       //
-       // - The relative order between Issue and Rename/Dispatch is left as a modeling
-       //   choice here; the homework text does not give a single mandatory ordering
-       //   between them. 
-       //   We choose Rename/Dispatch -> Issue because queue updates are visible to later same-cycle readers.
-       //
-       // - The relative order between Issue and Fetch/Decode is also not directly fixed
-       //   by the homework text; Fetch/Decode is mainly constrained by Rename/Dispatch
-       //   backpressure and Commit exception control.
+       // - Issue is before Rename/Dispatch to prevent instructions put to the IQ from being
+       //   issued in the same cycle. 
        //
        // Important:
        // - "The updates to all queues ... in a cycle can be used by the incoming
        //   instructions in the same cycle."
        // - exception entry has priority over normal downstream behavior
        // - after propagation, finalize next-state from the working views and then latch
-        execution_unit.propagate(curr, view, next, cycle_context);
-        commit_unit.propagate(curr, view, next, cycle_context);
-        rename_and_dispatch_unit.propagate(curr, view, next, cycle_context);
-        issue_unit.propagate(curr, view, next, cycle_context);
-        fetch_and_decode_unit.propagate(curr, view, next, cycle_context);
-
+       execution.propagate(curr, view, next, cycle_context);
+       commit.propagate(curr, view, next, cycle_context);
+       if (cycle_context.is_execution_reset_requested())
+        {
+            execution.reset_stage();
+        }
+       issue.propagate(curr, view, next, cycle_context, execution);
+       rename_dispatch.propagate(curr, view, next, cycle_context);
+       fetch_decode.propagate(curr, view, next, cycle_context, imem);
         // advance clock, start next cycle
         view.write_back_to_state(next);
-        latch(curr, next);
+        latch(curr, next, view, cycle_context);
         log.push_back(curr.dump());
     }
     
-    // 3. save the output JSON log
+    // 4. save the output JSON log
     save_log(log, output_path);
+    return 0;
 }
+
+
 
 
 
@@ -194,3 +185,24 @@ int main(int argc, char* argv[])
  
 
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
