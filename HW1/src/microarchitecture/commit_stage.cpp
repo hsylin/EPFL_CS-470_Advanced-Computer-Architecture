@@ -2,7 +2,7 @@
 
 void commit_stage::apply_forwarding_results(
     View& view,
-    const CycleContext& cycle_context) const
+    CycleContext& cycle_context) const
 {
     for (std::size_t i = 0; i < cycle_context.forwarding_count(); ++i)
     {
@@ -16,6 +16,14 @@ void commit_stage::apply_forwarding_results(
             {
                 entry.done = true;
                 entry.exception = forwarding_result.exception;
+
+                if (j == 0 && forwarding_result.exception)
+                {
+                    cycle_context.request_suppress_head_exception_forwarding(
+                        forwarding_result.pc
+                    );
+                }
+
                 break;
             }
         }

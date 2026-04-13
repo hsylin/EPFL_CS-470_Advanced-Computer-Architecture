@@ -1,7 +1,8 @@
 #include "issue_stage.hpp"
 #include "execution_stage.hpp"
 
- void issue_stage::apply_forwarding_results(
+
+void issue_stage::apply_forwarding_results(
     View& view,
     const CycleContext& cycle_context) const
 {
@@ -9,7 +10,7 @@
     {
         const auto& forwarding_result = cycle_context.forwarding_at(i);
 
-        if (forwarding_result.exception)
+        if (cycle_context.should_suppress_forwarding(forwarding_result.pc))
         {
             continue;
         }
@@ -35,6 +36,7 @@
     }
 }
 
+
 void issue_stage::propagate(const State& curr,
                             View& view,
                             State& next,
@@ -44,6 +46,8 @@ void issue_stage::propagate(const State& curr,
     (void)curr;
     (void)next;
 
+
+    
     if (cycle_context.is_integer_queue_reset_requested())
     {
         view.integer_queue.reset();
@@ -51,6 +55,7 @@ void issue_stage::propagate(const State& curr,
     }
 
     apply_forwarding_results(view, cycle_context);
+    
 
     std::size_t issue_count = 0;
     std::size_t j = 0;

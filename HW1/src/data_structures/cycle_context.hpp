@@ -56,6 +56,9 @@ public:
     void request_integer_queue_reset();
     bool is_integer_queue_reset_requested() const;
 
+    void request_suppress_head_exception_forwarding(unsigned int pc);
+    bool should_suppress_forwarding(unsigned int pc) const;
+
 private:
     static constexpr std::size_t MAX_FORWARDING_RESULTS = 4;
 
@@ -67,4 +70,10 @@ private:
     bool halt_rename_dispatch_flag;
     bool execution_reset_flag;
     bool integer_queue_reset_flag;
+    bool suppress_head_exception_forwarding_flag = false;
+    unsigned int suppress_head_exception_forwarding_pc = 0;
 };
+
+
+
+

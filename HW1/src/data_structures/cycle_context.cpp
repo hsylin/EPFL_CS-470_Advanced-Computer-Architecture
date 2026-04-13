@@ -13,6 +13,9 @@ void CycleContext::clear()
     integer_queue_reset_flag = false;
     halt_fetch_decode_flag = false;
     halt_rename_dispatch_flag = false;
+
+    suppress_head_exception_forwarding_flag = false;
+    suppress_head_exception_forwarding_pc = 0;
 }
 
 bool CycleContext::add_forwarding_result(unsigned int physical_register,
@@ -102,4 +105,17 @@ void CycleContext::request_integer_queue_reset()
 bool CycleContext::is_integer_queue_reset_requested() const
 {
     return integer_queue_reset_flag;
+}
+
+
+void CycleContext::request_suppress_head_exception_forwarding(unsigned int pc)
+{
+    suppress_head_exception_forwarding_flag = true;
+    suppress_head_exception_forwarding_pc = pc;
+}
+
+bool CycleContext::should_suppress_forwarding(unsigned int pc) const
+{
+    return suppress_head_exception_forwarding_flag &&
+           suppress_head_exception_forwarding_pc == pc;
 }

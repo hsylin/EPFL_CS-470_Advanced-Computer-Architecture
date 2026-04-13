@@ -8,7 +8,7 @@ void rename_and_dispatch_stage::apply_forwarding_results(
     {
         const auto& forwarding_result = cycle_context.forwarding_at(i);
 
-        if (forwarding_result.exception)
+        if (cycle_context.should_suppress_forwarding(forwarding_result.pc))
         {
             continue;
         }
