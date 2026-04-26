@@ -99,6 +99,19 @@ inline bool is_schedule_slot_empty(
     return is_bundle_slot_empty(schedule[cycle], slot);
 }
 
+inline bool is_any_schedule_slot_empty(
+    const schedule_t& schedule,
+    int cycle,
+    std::vector<bundle_slot_t> slots
+)
+{
+    for (bundle_slot_t slot : slots) {
+        if (is_schedule_slot_empty(schedule, cycle, slot)) return true;
+    }
+
+    return false;
+}
+
 inline void put_instruction_in_schedule(
     schedule_t& schedule,
     int cycle,
