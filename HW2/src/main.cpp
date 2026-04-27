@@ -9,8 +9,11 @@
 #include <cstdint>
 #include <nlohmann/json.hpp>
 
-#include "instruction.hpp"
+#include "program_loader.hpp"
+#include "instruction_parser.hpp"
 #include "basic_block.hpp"
+#include "dependency_analysis.hpp"
+#include "loop_scheduling.hpp"
 
 
 
