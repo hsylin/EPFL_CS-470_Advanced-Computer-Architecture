@@ -2,32 +2,71 @@
 
 #include <fstream>
 #include <stdexcept>
+#include <string>
 
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
-void write_schedule(const std::string& path, const schedule_t& schedule)
+static std::string format_output_instruction(const std::string& text)
 {
-    json j = json::array();
-
-    for (const auto& bundle : schedule)
+    if (text.empty())
     {
-        json row = json::array();
-
-        for (const auto& instruction_text : bundle)
-        {
-            row.push_back(instruction_text);
-        }
-
-        j.push_back(row);
+        return text;
     }
 
+    if (text == "nop")
+    {
+        return " nop";
+    }
+
+    if (text[0] == '(')
+    {
+        return text;
+    }
+
+    if (text[0] == ' ')
+    {
+        return text;
+    }
+
+    return " " + text;
+}
+
+void write_schedule(const std::string& path, const schedule_t& schedule)
+{
     std::ofstream out(path);
     if (!out)
     {
         throw std::runtime_error("Failed to open output file: " + path);
     }
 
-    out << j.dump(4) << "\n";
+    out << "[\n";
+
+    for (std::size_t i = 0; i < schedule.size(); i++)
+    {
+        out << "  [";
+
+        for (std::size_t j = 0; j < schedule[i].size(); j++)
+        {
+            json instruction_json = format_output_instruction(schedule[i][j]);
+            out << instruction_json.dump();
+
+            if (j + 1 < schedule[i].size())
+            {
+                out << ", ";
+            }
+        }
+
+        out << "]";
+
+        if (i + 1 < schedule.size())
+        {
+            out << ",";
+        }
+
+        out << "\n";
+    }
+
+    out << "]\n";
 }
