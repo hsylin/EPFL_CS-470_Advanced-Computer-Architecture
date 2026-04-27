@@ -128,6 +128,16 @@ inline void put_instruction_in_schedule(
     );
 }
 
+inline void combine_schedules(schedule_t& schedule1, schedule_t& schedule2, int padding = 0) 
+{
+    padding += schedule1.size();
+    ensure_schedule_has_cycle(schedule1, padding);
+
+    for (bundle_t bundle : schedule2) {
+        schedule1.push_back(bundle);
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Execution-unit of instruction to bundle-slot mapping
 // -----------------------------------------------------------------------------
