@@ -177,7 +177,7 @@ register_ref_t parse_register(const std::string& text)
     return {register_kind_t::P, index};
 }
 
-int64_t parse_immediate_value_value(const std::string& text)
+int64_t parse_immediate_value(const std::string& text)
 {
     std::string s = trim(text);
 

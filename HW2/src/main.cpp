@@ -9,13 +9,28 @@
 #include <cstdint>
 #include <nlohmann/json.hpp>
 
-#include "program_loader.hpp"
-#include "instruction_parser.hpp"
+#include "instruction.hpp"
 #include "basic_block.hpp"
-#include "dependency_analysis.hpp"
-#include "loop_scheduling.hpp"
+#include <exception>
+#include <iostream>
+#include <vector>
 
+#include "frontend/program_loader.hpp"
+#include "frontend/instruction_parser.hpp"
+#include "frontend/basic_block.hpp"
 
+#include "middleend/dependency_analysis.hpp"
+
+#include "common/instruction.hpp"
+#include "common/schedule.hpp"
+
+#include "backend/output/schedule_writer.hpp"
+
+// #include "backend/loop_scheduling.hpp"
+
+#include "backend/looppip/looppip_scheduler.hpp"
+#include "backend/looppip/rotating_register_allocator.hpp"
+#include "backend/looppip/looppip_preparer.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -30,14 +45,50 @@ int main(int argc, char* argv[])
     // 3. analyze dependencies
     dependency_table_t dependency_table = analyze_dependencies(program);
     
-    // TODO
-    // 4. generate loop_schedule
-    schedule_t loop_schedule = schedule_loop(program, deps, block_info);
-    // 5. generate looppip_schedule
-    schedule_t looppip_schedule = schedule_looppip(program, deps, block_info);
+   
+    // 4. No-loop case
 
-    write_schedule(paths.loop_output_path, loop_schedule);
-    write_schedule(paths.looppip_output_path, looppip_schedule);
+    //if (!block_info.has_loop)
+    // {
+    //    const schedule_t schedule = schedule_loop(program, dependency_table, block_info);
+
+    //    write_schedule(paths.loop_output_path, schedule);
+    //    write_schedule(paths.looppip_output_path, schedule);
+
+    //    return 0;
+    // }
+
+    // 5. generate loop_schedule
+    // schedule_t loop_schedule = schedule_loop(program, dependency_table, block_info);
+    // 6. generate looppip_schedule
+
+    looppip_schedule_result_t looppip_result =
+    schedule_looppip(
+        program,
+        dependency_table,
+        block_info
+    );
+
+    schedule_t allocated_looppip_schedule =
+    allocate_rotating_registers(
+        program,
+        dependency_table,
+        block_info,
+        looppip_result
+    );
+
+   schedule_t final_looppip_schedule =
+    prepare_looppip_schedule(
+        allocated_looppip_schedule,
+        looppip_result
+    );
+
+
+    //6. Write JSON outputs    
+
+
+    // write_schedule(paths.loop_output_path, loop_schedule);
+    write_schedule(paths.looppip_output_path, final_looppip_schedule);
 
     return 0;
 }

@@ -179,7 +179,7 @@ struct instruction_t
 
     std::vector<register_ref_t> src_regs;
 
-
+    int original_pc = -1;
     int scheduled_cycle = -1;
     int scheduled_stage = -1;
     std::string raw;

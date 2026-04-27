@@ -166,3 +166,88 @@ inline std::vector<bundle_slot_t> possible_slots_for_unit(
 
     return {};
 }
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------------------------
+// Intermediate scheduling result for loopip
+// -----------------------------------------------------------------------------
+//
+// schedule_t is the final output format used by schedule_writer.
+// scheduled_program_t is an internal backend representation.
+//
+// The scheduler only decides where each original instruction is placed:
+//   instruction_address -> cycle / stage / slot
+//
+// Register allocation later uses this placement information to generate
+// the final instruction strings stored in schedule_t.
+//
+
+struct scheduled_instruction_t
+{
+    int instruction_address = -1;
+    int cycle = -1;
+    int stage = -1;
+
+    bundle_slot_t slot = bundle_slot_t::ALU0;
+};
+
+struct scheduled_program_t
+{
+    std::vector<scheduled_instruction_t> scheduled_instructions;
+};
+
+
+
+// -----------------------------------------------------------------------------
+// Helper functions for scheduled_program_t
+// -----------------------------------------------------------------------------
+
+inline void add_scheduled_instruction(
+    scheduled_program_t& scheduled_program,
+    int instruction_address,
+    int cycle,
+    bundle_slot_t slot,
+    int stage = -1
+)
+{
+    if (instruction_address < 0)
+    {
+        throw std::runtime_error("Instruction address cannot be negative.");
+    }
+
+    if (cycle < 0)
+    {
+        throw std::runtime_error("Scheduled cycle cannot be negative.");
+    }
+
+    scheduled_instruction_t scheduled_instruction;
+    scheduled_instruction.instruction_address = instruction_address;
+    scheduled_instruction.cycle = cycle;
+    scheduled_instruction.stage = stage;
+    scheduled_instruction.slot = slot;
+
+    scheduled_program.scheduled_instructions.push_back(scheduled_instruction);
+}
+
+inline const scheduled_instruction_t* find_scheduled_instruction(
+    const scheduled_program_t& scheduled_program,
+    int instruction_address
+)
+{
+    for (const scheduled_instruction_t& scheduled_instruction :
+         scheduled_program.scheduled_instructions)
+    {
+        if (scheduled_instruction.instruction_address == instruction_address)
+        {
+            return &scheduled_instruction;
+        }
+    }
+
+    return nullptr;
+}
