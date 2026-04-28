@@ -6,27 +6,27 @@
 
 
 // -----------------------------------------------------------------------------
-// Helper functions for dependency analysis
+// Helper functions for loop scheduling
 // -----------------------------------------------------------------------------
 
-static int find_valid_cycle(schedule_t& schedule, const int start, const execution_unit_t unit) {
+static int find_valid_cycle(loop_schedule_result_t& schedule, const int start, const execution_unit_t unit) {
     int cycle = start;
     std::vector<bundle_slot_t> slots = possible_slots_for_unit(unit);
 
-    while (!is_any_schedule_slot_empty(schedule, cycle, slots)) {
+    while (!is_any_slot_empty(schedule, cycle, slots)) {
         cycle++;
     }
 
-    ensure_schedule_has_cycle(schedule, cycle);
+    ensure_loop_schedule_has_cycle(schedule, cycle);
     return cycle;
 }
 
-static void schedule_instruction(schedule_t& schedule, const int cycle, instruction_t& instruction) {
+static void schedule_instruction(loop_schedule_result_t& schedule, const int cycle, instruction_t& instruction) {
     std::vector<bundle_slot_t> slots = possible_slots_for_unit(instruction.unit);
 
     for (bundle_slot_t slot : slots) {
-        if (is_schedule_slot_empty(schedule, cycle, slot)) {
-            put_instruction_in_schedule(schedule, cycle, slot, instruction.raw);
+        if (is_slot_empty(schedule, cycle, slot)) {
+            put_instruction_in_loop_schedule(schedule, cycle, slot, instruction);
             instruction.scheduled_cycle = cycle;
             return;
         }
@@ -64,21 +64,17 @@ static void increment_instructions_scheduled_cycle(
     }
 }
 
-static int max(int x, int y) {
-    return x >= y ? x : y;
-}
-
 
 // -----------------------------------------------------------------------------
-// Main functions for dependency analysis
+// Main functions for loop scheduling
 // -----------------------------------------------------------------------------
 
-schedule_t schedule_loop(
+loop_schedule_result_t schedule_loop(
 	std::vector<instruction_t>& program,
 	const dependency_table_t& dependency_table,
 	const basic_block_info_t& block_info)
 {
-    schedule_t schedule;
+    loop_schedule_result_t schedule;
 
     const int size_of_block_0 = block_info.has_loop ? block_info.loop_start_address : program.size();
 
@@ -97,7 +93,7 @@ schedule_t schedule_loop(
 
     // Only schedule BB1 and BB2 if they exist
     if (block_info.has_loop) {
-        schedule_t bb1_schedule;
+        loop_schedule_result_t bb1_schedule;
         int bb0_to_bb1_padding = 0;
         int initiation_interval = calculate_ii_res(program, block_info);
 
@@ -128,7 +124,9 @@ schedule_t schedule_loop(
         }
 
         // Schedule loop instuction
-        schedule_instruction(bb1_schedule, initiation_interval - 1, program[block_info.loop_instruction_address]);
+        instruction_t loop_instruction = program[block_info.loop_instruction_address];
+        loop_instruction.operands[0].immediate = schedule.size() + bb0_to_bb1_padding;
+        schedule_instruction(bb1_schedule, initiation_interval - 1, loop_instruction);
 
         increment_instructions_scheduled_cycle(
             program,
@@ -136,12 +134,12 @@ schedule_t schedule_loop(
             block_info.loop_start_address,
             block_info.loop_instruction_address + 1
         );
-        combine_schedules(schedule, bb1_schedule, bb0_to_bb1_padding);
+        combine_loop_schedules(schedule, bb1_schedule, bb0_to_bb1_padding);
 
 
 
         // Schedule block 2
-        schedule_t bb2_schedule;
+        loop_schedule_result_t bb2_schedule;
 
         for (int i = block_info.loop_instruction_address + 1; i < static_cast<int>(program.size()); i++)
         {
@@ -165,8 +163,19 @@ schedule_t schedule_loop(
             block_info.loop_instruction_address + 1,
             program.size()
         );
-        combine_schedules(schedule, bb2_schedule);
+        combine_loop_schedules(schedule, bb2_schedule);
     }
 
     return schedule;
+}
+
+
+
+// -----------------------------------------------------------------------------
+// Main functions for loop scheduling
+// -----------------------------------------------------------------------------
+
+
+schedule_t encode_schedule(schedule_loop) {
+    //TODO transform to string
 }

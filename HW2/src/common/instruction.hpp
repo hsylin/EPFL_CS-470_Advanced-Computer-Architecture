@@ -61,6 +61,8 @@ struct register_ref_t
     }
 };
 
+const int MAX_REG_INDEX = 95;
+
 inline bool is_x_register(const register_ref_t& reg) 
 {
     return reg.kind == register_kind_t::X && reg.index >= 0 && reg.index <= 95;

@@ -1,5 +1,8 @@
 #pragma once
 
-#include "loop_scheduling.hpp";
+#include "loop_scheduling.hpp"
 
-loop_schedule_result_t rename_registers(loop_schedule_result_t& schedule, const dependency_table_t& dependency_table);
+void rename_registers(
+	loop_schedule_result_t& schedule, 
+	dependency_table_t& dependency_table
+);
