@@ -26,7 +26,7 @@
 
 #include "backend/output/schedule_writer.hpp"
 
-// #include "backend/loop_scheduling.hpp"
+#include "backend/loop/loop_scheduling.hpp"
 
 #include "backend/looppip/looppip_scheduler.hpp"
 #include "backend/looppip/rotating_register_allocator.hpp"
@@ -48,18 +48,19 @@ int main(int argc, char* argv[])
    
     // 4. No-loop case
 
-    //if (!block_info.has_loop)
-    // {
-    //    const schedule_t schedule = schedule_loop(program, dependency_table, block_info);
+    if (!block_info.has_loop)
+    {
+        const schedule_t schedule = schedule_loop(program, dependency_table, block_info);
 
-    //    write_schedule(paths.loop_output_path, schedule);
-    //    write_schedule(paths.looppip_output_path, schedule);
+        write_schedule(paths.loop_output_path, schedule);
+        write_schedule(paths.looppip_output_path, schedule);
 
-    //    return 0;
-    // }
+       return 0;
+    }
 
     // 5. generate loop_schedule
-    // schedule_t loop_schedule = schedule_loop(program, dependency_table, block_info);
+    schedule_t loop_schedule = schedule_loop(program, dependency_table, block_info);
+
     // 6. generate looppip_schedule
 
     looppip_schedule_result_t looppip_result =
@@ -87,7 +88,7 @@ int main(int argc, char* argv[])
     //6. Write JSON outputs    
 
 
-    // write_schedule(paths.loop_output_path, loop_schedule);
+    write_schedule(paths.loop_output_path, loop_schedule);
     write_schedule(paths.looppip_output_path, final_looppip_schedule);
 
     return 0;
