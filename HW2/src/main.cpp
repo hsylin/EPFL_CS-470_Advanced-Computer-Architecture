@@ -51,10 +51,14 @@ int main(int argc, char* argv[])
 
     if (!block_info.has_loop)
     {
-        const loop_schedule_result_t schedule = schedule_loop(program, dependency_table, block_info);
+        loop_schedule_result_t loop_schedule = schedule_loop(program, dependency_table, block_info);
 
-        //write_schedule(paths.loop_output_path, schedule);
-        //write_schedule(paths.looppip_output_path, schedule);
+        rename_registers(loop_schedule, dependency_table);
+
+        schedule_t schedule = encode_schedule(loop_schedule);
+
+        write_schedule(paths.loop_output_path, schedule);
+        write_schedule(paths.looppip_output_path, schedule);
 
        return 0;
     }
@@ -63,6 +67,9 @@ int main(int argc, char* argv[])
     loop_schedule_result_t loop_schedule = schedule_loop(program, dependency_table, block_info);
 
     rename_registers(loop_schedule, dependency_table);
+
+    schedule_t final_loop_schedule = encode_schedule(loop_schedule);
+
 
     // 6. generate looppip_schedule
 
@@ -91,7 +98,7 @@ int main(int argc, char* argv[])
     //6. Write JSON outputs    
 
 
-    //write_schedule(paths.loop_output_path, loop_schedule);
+    write_schedule(paths.loop_output_path, final_loop_schedule);
     write_schedule(paths.looppip_output_path, final_looppip_schedule);
 
     return 0;

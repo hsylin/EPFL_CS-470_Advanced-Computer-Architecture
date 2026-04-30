@@ -11,8 +11,8 @@
 
 static int read_last_p_register(loop_schedule_result_t& schedule) {
 	int p_reg = 0;
-	for (auto bundle : schedule) {
-		for (instruction_t instruction : bundle) {
+	for (auto& bundle : schedule) {
+		for (instruction_t& instruction : bundle) {
 
 			if (instruction.dest) {
 				register_ref_t reg = *instruction.dest;
@@ -29,8 +29,8 @@ static int read_last_p_register(loop_schedule_result_t& schedule) {
 
 static int read_last_x_register(loop_schedule_result_t& schedule) {
 	int x_reg = 0;
-	for (auto bundle : schedule) {
-		for (instruction_t instruction : bundle) {
+	for (auto& bundle : schedule) {
+		for (instruction_t& instruction : bundle) {
 
 			if (instruction.dest) {
 				register_ref_t reg = *instruction.dest;
@@ -45,22 +45,28 @@ static int read_last_x_register(loop_schedule_result_t& schedule) {
 	return x_reg;
 }
 
-static std::vector<dependency_t> all_dependencies(const instruction_dependency_info_t& entry) {
+static std::vector<dependency_t> all_dependencies(dependency_table_t& dependency_table, int cycle) {
 	std::vector<dependency_t> dependencies;
 
-	for (dependency_t d : entry.local_dependencies) {
+	if (cycle < 0) {
+		return dependencies; // The instruction was added during scheduling (Nop or Mov to avoid dependencies)
+	}
+
+	instruction_dependency_info_t& entry = dependency_table.entries[cycle];
+
+	for (dependency_t& d : entry.local_dependencies) {
 		dependencies.push_back(d);
 	}
 
-	for (dependency_t d : entry.loop_invariant_dependencies) {
+	for (dependency_t& d : entry.interloop_dependencies) {
 		dependencies.push_back(d);
 	}
 
-	for (dependency_t d : entry.post_loop_dependencies) {
+	for (dependency_t& d : entry.post_loop_dependencies) {
 		dependencies.push_back(d);
 	}
 
-	for (dependency_t d : entry.loop_invariant_dependencies) {
+	for (dependency_t& d : entry.loop_invariant_dependencies) {
 		dependencies.push_back(d);
 	}
 
@@ -68,8 +74,8 @@ static std::vector<dependency_t> all_dependencies(const instruction_dependency_i
 }
 
 static register_ref_t register_produced_by_original_address(loop_schedule_result_t& schedule, int address) {
-	for (auto bundle : schedule) {
-		for (instruction_t instruction : bundle) {
+	for (auto& bundle : schedule) {
+		for (instruction_t& instruction : bundle) {
 			
 			if (instruction.original_pc == address && instruction.dest) {
 				return *instruction.dest;
@@ -82,9 +88,36 @@ static register_ref_t register_produced_by_original_address(loop_schedule_result
 	);
 }
 
-static instruction_t find_loop_instruction_address(loop_schedule_result_t& schedule) {
-	for (auto bundle : schedule) {
-		for (instruction_t instruction : bundle) {
+static void update_register_operand(instruction_t& instruction, int index, register_ref_t& reg) {
+	int start = instruction.dest ? 1 : 0;
+
+	for (int i = start; i < static_cast<int>(instruction.operands.size()); i++) {
+		if (instruction.operands[i].kind == operand_kind_t::Register) {
+			if (index == 0) {
+				instruction.operands[i].reg = reg;
+				return;
+			}
+			else {
+				index--;
+			}
+		}
+		if (instruction.operands[i].kind == operand_kind_t::Memory) {
+			if (index == 0) {
+				instruction.operands[i].memory.base_register = reg;
+				return;
+			}
+			else {
+				index--;
+			}
+		}
+	}
+
+	throw std::runtime_error("Can't find required operand.");
+}
+
+static instruction_t find_loop_instruction(loop_schedule_result_t& schedule) {
+	for (auto& bundle : schedule) {
+		for (instruction_t& instruction : bundle) {
 			if (instruction.opcode == instruction_opcode_t::Loop) {
 				return instruction;
 			}
@@ -102,12 +135,12 @@ static void instert_mov_at_end_of_loop(
 	register_ref_t dest_reg
 ) 
 {
-	instruction_t loop_instruction = find_loop_instruction_address(schedule);
+	instruction_t loop_instruction = find_loop_instruction(schedule);
 
 	int earliest_cycle = loop_instruction.scheduled_cycle;
 
 	for (int i = loop_instruction.operands[0].immediate; i <= loop_instruction.scheduled_cycle; i++) {
-		for (instruction_t instruction : schedule[i]) {
+		for (instruction_t& instruction : schedule[i]) {
 			if (instruction.dest && instruction.dest == origin_reg) {
 				earliest_cycle = max(earliest_cycle, instruction.scheduled_cycle + instruction.latency);
 			}
@@ -123,15 +156,13 @@ static void instert_mov_at_end_of_loop(
 		insert_empty_cycles(
 			schedule, 
 			earliest_cycle - loop_instruction.scheduled_cycle,
-			loop_instruction.scheduled_cycle
+			loop_instruction.scheduled_cycle + 1
 		);
-		instruction_t nop_instruction;
-		nop_instruction.opcode = instruction_opcode_t::Nop;
 
-		put_instruction_in_loop_schedule(schedule, loop_instruction.scheduled_cycle, bundle_slot_t::Branch, nop_instruction);
+		remove_instruction_from_loop_schedule(schedule, loop_instruction.scheduled_cycle, bundle_slot_t::Branch);
 
-		put_instruction_in_loop_schedule(schedule, earliest_cycle, bundle_slot_t::Branch, loop_instruction);
 		loop_instruction.scheduled_cycle = earliest_cycle;
+		put_instruction_in_loop_schedule(schedule, earliest_cycle, bundle_slot_t::Branch, loop_instruction);
 	}
 
 	instruction_t mov_instruction;
@@ -150,7 +181,7 @@ static void instert_mov_at_end_of_loop(
 	mov_instruction.operands.push_back(origin_op);
 	mov_instruction.src_regs.push_back(origin_reg);
 
-	for (bundle_slot_t slot : slots) {
+	for (bundle_slot_t& slot : slots) {
 		if (is_slot_empty(schedule, earliest_cycle, slot)) {
 			put_instruction_in_loop_schedule(schedule, earliest_cycle, slot, mov_instruction);
 			mov_instruction.scheduled_cycle = earliest_cycle;
@@ -159,7 +190,7 @@ static void instert_mov_at_end_of_loop(
 	}
 }
 
-static void rename_register(register_ref_t& reg, int next_index_p, int next_index_x) {
+static void rename_register(register_ref_t& reg, int& next_index_p, int& next_index_x) {
 	switch (reg.kind) {
 		case register_kind_t::P: {
 			if (next_index_p > MAX_REG_INDEX) {
@@ -187,6 +218,8 @@ static void rename_register(register_ref_t& reg, int next_index_p, int next_inde
 		default:
 			break;
 		}
+
+	reg.renamed = true;
 }
 
 
@@ -199,8 +232,8 @@ static void rename_produced_registers(loop_schedule_result_t& schedule) {
 	int next_index_x = 1;
 	int next_index_p = 1;
 
-	for (auto bundle : schedule) {
-		for (instruction_t instruction : bundle) {
+	for (auto& bundle : schedule) {
+		for (instruction_t& instruction : bundle) {
 
 			// Check if the instruction produces a new value
 			if (instruction.dest) {
@@ -208,6 +241,12 @@ static void rename_produced_registers(loop_schedule_result_t& schedule) {
 
 
 				rename_register(reg, next_index_p, next_index_x);
+				instruction.dest = reg;
+				instruction.operands[0].reg = reg;
+
+				if (instruction.operands[0].kind != operand_kind_t::Register) {
+					throw std::runtime_error("Destination operand is not a register.");
+				}
 			}
 		}
 	}
@@ -221,21 +260,27 @@ static void rename_produced_registers(loop_schedule_result_t& schedule) {
 
 static void rename_operand_registers(
 	loop_schedule_result_t& schedule, 
-	const dependency_table_t& dependency_table
+	dependency_table_t& dependency_table
 )
 {
-	for (auto bundle : schedule) {
-		for (instruction_t instruction : bundle) {
-			for (dependency_t dependency : all_dependencies(dependency_table.entries[instruction.original_pc])) {
-				int original_dependency_address = dependency.previous_iteration_producer_instruction_address;
-				if (original_dependency_address < 0) original_dependency_address = dependency.producer_instruction_address;
+	for (auto& bundle : schedule) {
+		for (instruction_t& instruction : bundle) {
+			for (dependency_t& dependency : all_dependencies(dependency_table, instruction.original_pc)) {
+				
+				int new_reg = register_produced_by_original_address(schedule, dependency.producer_instruction_address).index;
 
-				int new_reg = register_produced_by_original_address(schedule, original_dependency_address).index;
-
-				for (register_ref_t reg : instruction.src_regs) {
-					reg.index = new_reg;
-					dependency.operand_register.index = new_reg;
+				register_ref_t new_operand_reg;
+				for (int i = 0; i < static_cast<int>(instruction.src_regs.size()); i++) {
+					register_ref_t& reg = instruction.src_regs[i];
+					if (reg == dependency.operand_register) {
+						reg.index = new_reg;
+						reg.renamed = true;
+						new_operand_reg = reg;
+						update_register_operand(instruction, i, reg);
+					}
 				}
+				
+				dependency.operand_register = new_operand_reg;
 			}
 		}
 	}
@@ -249,21 +294,33 @@ static void rename_operand_registers(
 
 static void remove_interloop_dependencies(
 	loop_schedule_result_t& schedule,
-	const dependency_table_t& dependency_table
+	dependency_table_t& dependency_table
 )
 {
-	for (instruction_dependency_info_t entry : dependency_table.entries) {
-		for (dependency_t dependency : entry.interloop_dependencies) {
+	std::vector<register_ref_t> resolved;
+
+	for (instruction_dependency_info_t& entry : dependency_table.entries) {
+		for (dependency_t& dependency : entry.interloop_dependencies) {
 			if (dependency.previous_iteration_producer_instruction_address == -1) {
-				// Already correctly renamed in part 2
 				continue;
 			}
 
+			if (std::count(resolved.begin(), resolved.end(), dependency.operand_register) > 0) {
+				continue;
+			}
+
+			register_ref_t origin = register_produced_by_original_address(
+				schedule, dependency.previous_iteration_producer_instruction_address);
+			register_ref_t dest = register_produced_by_original_address(
+				schedule, dependency.producer_instruction_address);
+
 			instert_mov_at_end_of_loop(
 				schedule,
-				register_produced_by_original_address(schedule, dependency.previous_iteration_producer_instruction_address),
-				dependency.operand_register
+				origin,
+				dest
 			);
+
+			resolved.push_back(dest);
 		}
 	}
 }
@@ -276,28 +333,19 @@ static void remove_interloop_dependencies(
 
 
 static void rename_starting_registers(
-	loop_schedule_result_t& schedule,
-	const dependency_table_t& dependency_table
+	loop_schedule_result_t& schedule
 )
 {
 	int next_index_x = read_last_x_register(schedule) + 1;
 	int next_index_p = read_last_p_register(schedule) + 1;
 
-	for (auto bundle : schedule) {
-		for (instruction_t instruction : bundle) {
-			std::vector<register_ref_t> renamed;
-
-			if (instruction.dest) {
-				renamed.push_back(*instruction.dest);
-			}
-
-			for (dependency_t dependency : all_dependencies(dependency_table.entries[instruction.original_pc])) {
-				renamed.push_back(dependency.operand_register);
-			}
-
-			for (register_ref_t reg : instruction.src_regs) {
-				if (std::count(renamed.begin(), renamed.end(), reg) == 0) {
+	for (auto& bundle : schedule) {
+		for (instruction_t& instruction : bundle) {
+			for (int i = 0; i < static_cast<int>(instruction.src_regs.size()); i++) {
+				register_ref_t reg = instruction.src_regs[i];
+				if (!reg.renamed) {
 					rename_register(reg, next_index_p, next_index_x);
+					update_register_operand(instruction, i, reg);
 				}
 			}
 		}
@@ -312,7 +360,7 @@ static void rename_starting_registers(
 
 void rename_registers(
 	loop_schedule_result_t& schedule,
-	const dependency_table_t& dependency_table
+	dependency_table_t& dependency_table
 ) {
 	rename_produced_registers(schedule);
 	
@@ -320,5 +368,5 @@ void rename_registers(
 
 	remove_interloop_dependencies(schedule, dependency_table);
 
-	rename_starting_registers(schedule, dependency_table);
+	rename_starting_registers(schedule);
 }

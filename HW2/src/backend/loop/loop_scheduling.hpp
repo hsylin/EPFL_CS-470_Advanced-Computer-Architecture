@@ -20,7 +20,7 @@ inline int max(int x, int y) {
 inline std::array<instruction_t, 5> make_empty_instruction_bundle() 
 {
 	std::array<instruction_t, 5> bundle;
-	for (instruction_t i : bundle) {
+	for (instruction_t& i : bundle) {
 		i.opcode = instruction_opcode_t::Nop;
 	}
 
@@ -66,7 +66,7 @@ inline bool is_any_slot_empty(
 	std::vector<bundle_slot_t> slots
 )
 {
-	for (bundle_slot_t slot : slots) {
+	for (bundle_slot_t& slot : slots) {
 		if (is_slot_empty(schedule, cycle, slot)) return true;
 	}
 
@@ -82,8 +82,14 @@ inline void combine_loop_schedules(
 	int last_cycle = schedule1.size() - 1 + padding;
 	ensure_loop_schedule_has_cycle(schedule1, last_cycle);
 
-	for (auto bundle : schedule2) {
+	for (auto& bundle : schedule2) {
 		schedule1.push_back(bundle);
+	}
+
+	for (int i = 0; i < static_cast<int>(schedule1.size()); i++) {
+		for (instruction_t& instruction : schedule1[i]) {
+			instruction.scheduled_cycle = i;
+		}
 	}
 }
 
@@ -91,7 +97,7 @@ inline void put_instruction_in_loop_schedule(
 	loop_schedule_result_t& schedule,
 	int cycle,
 	bundle_slot_t slot,
-	const instruction_t& instruction
+	instruction_t& instruction
 )
 {
 	ensure_loop_schedule_has_cycle(schedule, cycle);
@@ -108,6 +114,21 @@ inline void put_instruction_in_loop_schedule(
 	schedule[cycle][index] = instruction;
 }
 
+inline void remove_instruction_from_loop_schedule(
+	loop_schedule_result_t& schedule,
+	int cycle,
+	bundle_slot_t slot
+)
+{
+	if (cycle < 0 || cycle >= static_cast<int>(schedule.size())) {
+		throw std::runtime_error("Trying to remove an instruction from an invalid cycle.");
+	}
+
+	instruction_t nop_instruction;
+	nop_instruction.opcode = instruction_opcode_t::Nop;
+	schedule[cycle][bundle_slot_to_index(slot)] = nop_instruction;
+}
+
 inline void insert_empty_cycles(loop_schedule_result_t& schedule, int n, int pos) {
 	while (n > 0) {
 		schedule.insert(schedule.begin() + pos, make_empty_instruction_bundle());
@@ -117,9 +138,9 @@ inline void insert_empty_cycles(loop_schedule_result_t& schedule, int n, int pos
 
 
 
-schedule_t encode_schedule(schedule_loop);
+schedule_t encode_schedule(const loop_schedule_result_t& schedule);
 
 loop_schedule_result_t schedule_loop(
-	std::vector<instruction_t>& program, 
-	const dependency_table_t& dependency_table, 
+	const std::vector<instruction_t>& program, 
+	dependency_table_t& dependency_table, 
 	const basic_block_info_t& block_info);

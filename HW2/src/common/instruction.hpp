@@ -52,6 +52,8 @@ struct register_ref_t
     register_kind_t kind = register_kind_t::None;
     int index = -1;
 
+    bool renamed = false;
+
     bool operator==(const register_ref_t& other) const {
         return kind == other.kind && index == other.index;
     }
