@@ -694,17 +694,81 @@ instruction_t parse_instruction(const std::string& raw, int instruction_address)
     return instruction;
 }
 
+
+
+
 std::vector<instruction_t> parse_program(
     const std::vector<std::string>& raw_program
 )
 {
-    std::vector<instruction_t> program;
-    program.reserve(raw_program.size());
+    std::vector<instruction_t> parsed_program;
+    parsed_program.reserve(raw_program.size());
 
     for (std::size_t i = 0; i < raw_program.size(); i++) {
-        program.push_back(
+        parsed_program.push_back(
             parse_instruction(raw_program[i], static_cast<int>(i))
         );
+    }
+
+    // Map old instruction addresses to compacted addresses after removing nops.
+    std::vector<int> old_to_new(raw_program.size() + 1, -1);
+
+    int new_address = 0;
+    for (std::size_t old_address = 0; old_address < parsed_program.size(); old_address++) {
+        if (parsed_program[old_address].opcode != instruction_opcode_t::Nop) {
+            old_to_new[old_address] = new_address;
+            new_address++;
+        }
+    }
+
+    // If a loop target points to a nop, redirect it to the next non-nop instruction.
+    int next_valid_address = new_address;
+    old_to_new[raw_program.size()] = new_address;
+
+    for (int old_address = static_cast<int>(raw_program.size()) - 1;
+         old_address >= 0;
+         old_address--) {
+        if (old_to_new[old_address] == -1) {
+            old_to_new[old_address] = next_valid_address;
+        } else {
+            next_valid_address = old_to_new[old_address];
+        }
+    }
+
+    std::vector<instruction_t> program;
+    program.reserve(new_address);
+
+    for (std::size_t old_address = 0; old_address < parsed_program.size(); old_address++) {
+        instruction_t instruction = parsed_program[old_address];
+
+        // Discard input nops.
+        if (instruction.opcode == instruction_opcode_t::Nop) {
+            continue;
+        }
+
+        const int compact_address = static_cast<int>(program.size());
+
+        instruction.instruction_address = compact_address;
+        instruction.original_pc = compact_address;
+
+        // Remap loop target from old input address to compacted address.
+        if (instruction.opcode == instruction_opcode_t::Loop ||
+            instruction.opcode == instruction_opcode_t::LoopPip) {
+
+            int old_target = static_cast<int>(instruction.operands[0].immediate);
+
+            if (old_target < 0 ||
+                old_target >= static_cast<int>(old_to_new.size()) ||
+                old_to_new[old_target] >= new_address) {
+                throw std::runtime_error(
+                    "Invalid loop target after removing input nop instructions."
+                );
+            }
+
+            instruction.operands[0].immediate = old_to_new[old_target];
+        }
+
+        program.push_back(instruction);
     }
 
     return program;
