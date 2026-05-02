@@ -10,9 +10,9 @@ do
     loopPassed=false
     loopColor=$RED
 
-    for simple_ref in ${tnum}/simple_ref*.json
+    for simple_ref in "$tnum"/simple_ref*.json
     do
-        out="$(python compare.py --loop ${tnum}/simple.json --refLoop ${simple_ref})"
+        out="$(python compare.py --loop "$tnum/simple.json" --refLoop "$simple_ref")"
         passed=$(echo "$out" | head -n 1)
 
         if [[ "$passed" == *"PASSED"* ]]; then
@@ -24,9 +24,9 @@ do
     pipPassed=false
     pipColor=$RED
 
-    for pip_ref in ${tnum}/pip_ref*.json
+    for pip_ref in "$tnum"/pip_ref*.json
     do
-        out="$(python compare.py --pip ${tnum}/pip.json  --refPip ${pip_ref})"
+        out="$(python compare.py --pip "$tnum/pip.json" --refPip "$pip_ref")"
         passed=$(echo "$out" | head -n 1)
 
         if [[ "$passed" == *"PASSED"* ]]; then
@@ -35,10 +35,8 @@ do
         fi
     done
 
-    cat ${tnum}/desc.txt
+    cat "$tnum/desc.txt"
     printf "passed loop:  ${loopColor}${loopPassed}${RESET} passed pip: ${pipColor}${pipPassed}${RESET}\n\n"
-
 
     i=$((i+1))
 done
-
