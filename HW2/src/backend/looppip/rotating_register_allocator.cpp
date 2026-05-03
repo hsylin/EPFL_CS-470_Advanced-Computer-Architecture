@@ -19,7 +19,7 @@ struct register_allocation_state_t
     // instruction_address -> whether renamed_dest_by_address is rotating.
     std::vector<bool> dest_is_rotating;
 
-    std::vector<int> external_source_by_original;
+    std::vector<std::vector<int>> external_source_by_instruction_original;
 
     // instruction_address -> scheduled placement. e.g.instruction 5 -> cycle 4, stage 1, Mult slot
     std::vector<scheduled_instruction_t> placement_by_address;
@@ -527,7 +527,10 @@ static void assign_external_source_registers(
     register_allocation_state_t& state
 )
 {
-    state.external_source_by_original.assign(96, -1);
+    state.external_source_by_instruction_original.assign(
+        program.size(),
+        std::vector<int>(96, -1)
+    );
 
     const std::vector<int> scheduled_addresses =
         get_scheduled_addresses_in_order(program, state);
@@ -545,8 +548,14 @@ static void assign_external_source_registers(
             }
 
             if (source_register.index < 0 ||
-                source_register.index >= static_cast<int>(
-                    state.external_source_by_original.size()
+                source_register.index >= 96)
+            {
+                continue;
+            }
+
+            if (instruction.instruction_address < 0 ||
+                instruction.instruction_address >= static_cast<int>(
+                    state.external_source_by_instruction_original.size()
                 ))
             {
                 continue;
@@ -561,10 +570,14 @@ static void assign_external_source_registers(
                 continue;
             }
 
-            if (state.external_source_by_original[source_register.index] == -1)
+            int& external_index =
+                state.external_source_by_instruction_original
+                    [instruction.instruction_address]
+                    [source_register.index];
+
+            if (external_index == -1)
             {
-                state.external_source_by_original[source_register.index] =
-                    allocate_static_register(state);
+                external_index = allocate_static_register(state);
             }
         }
     }
@@ -822,13 +835,20 @@ static std::string resolve_source_register(
         );
     }
 
-    if (source_register.index >= 0 &&
+    if (instruction.instruction_address >= 0 &&
+        instruction.instruction_address < static_cast<int>(
+            state.external_source_by_instruction_original.size()
+        ) &&
+        source_register.index >= 0 &&
         source_register.index < static_cast<int>(
-            state.external_source_by_original.size()
+            state.external_source_by_instruction_original
+                [instruction.instruction_address].size()
         ))
     {
         const int external_index =
-            state.external_source_by_original[source_register.index];
+            state.external_source_by_instruction_original
+                [instruction.instruction_address]
+                [source_register.index];
 
         if (external_index != -1)
         {
@@ -840,6 +860,7 @@ static std::string resolve_source_register(
     // Keep the original register name.
     return register_to_string(source_register);
 }
+
 
 // -----------------------------------------------------------------------------
 // String formatting helpers
