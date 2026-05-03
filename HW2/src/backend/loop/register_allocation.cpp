@@ -84,7 +84,7 @@ static register_ref_t register_produced_by_original_address(loop_schedule_result
 	}
 
 	throw std::runtime_error(
-		"Can't find the cause of a dependency"
+		"Can't find the cause of a dependency."
 	);
 }
 
@@ -267,6 +267,10 @@ static void rename_operand_registers(
 		for (instruction_t& instruction : bundle) {
 			for (dependency_t& dependency : all_dependencies(dependency_table, instruction.original_pc)) {
 				
+				if (dependency.producer_instruction_address == -1) {
+					continue;
+				}
+
 				int new_reg = register_produced_by_original_address(schedule, dependency.producer_instruction_address).index;
 
 				register_ref_t new_operand_reg;
@@ -301,7 +305,8 @@ static void remove_interloop_dependencies(
 
 	for (instruction_dependency_info_t& entry : dependency_table.entries) {
 		for (dependency_t& dependency : entry.interloop_dependencies) {
-			if (dependency.previous_iteration_producer_instruction_address == -1) {
+			if (dependency.previous_iteration_producer_instruction_address == -1)
+			{
 				continue;
 			}
 
@@ -311,8 +316,16 @@ static void remove_interloop_dependencies(
 
 			register_ref_t origin = register_produced_by_original_address(
 				schedule, dependency.previous_iteration_producer_instruction_address);
-			register_ref_t dest = register_produced_by_original_address(
-				schedule, dependency.producer_instruction_address);
+			register_ref_t dest;
+			
+			if (dependency.producer_instruction_address != -1) {
+				dest = register_produced_by_original_address(schedule, dependency.producer_instruction_address);
+			}
+			else {
+				// If it doesn't have a producer in BB0, the operand register was renamed
+				dest = dependency.operand_register; 
+			}
+			
 
 			instert_mov_at_end_of_loop(
 				schedule,
@@ -333,7 +346,8 @@ static void remove_interloop_dependencies(
 
 
 static void rename_starting_registers(
-	loop_schedule_result_t& schedule
+	loop_schedule_result_t& schedule, 
+	dependency_table_t& dependency_table
 )
 {
 	int next_index_x = read_last_x_register(schedule) + 1;
@@ -344,8 +358,22 @@ static void rename_starting_registers(
 			for (int i = 0; i < static_cast<int>(instruction.src_regs.size()); i++) {
 				register_ref_t reg = instruction.src_regs[i];
 				if (!reg.renamed) {
-					rename_register(reg, next_index_p, next_index_x);
-					update_register_operand(instruction, i, reg);
+					rename_register(instruction.src_regs[i], next_index_p, next_index_x);
+					update_register_operand(instruction, i, instruction.src_regs[i]);
+
+					for (int j = i; j < static_cast<int>(instruction.src_regs.size()); j++) {
+						if (instruction.src_regs[j] == reg && !instruction.src_regs[j].renamed) {
+							instruction.src_regs[j] = instruction.src_regs[i];
+							update_register_operand(instruction, j, instruction.src_regs[i]);
+						}
+					}
+
+					// Rename interloop dependencies
+					for (dependency_t& dependency : dependency_table.entries[instruction.original_pc].interloop_dependencies) {
+						if (dependency.operand_register == reg) {
+							dependency.operand_register = instruction.src_regs[i];
+						}
+					}
 				}
 			}
 		}
@@ -360,13 +388,15 @@ static void rename_starting_registers(
 
 void rename_registers(
 	loop_schedule_result_t& schedule,
-	dependency_table_t& dependency_table
+	const dependency_table_t& dependency_table
 ) {
+	dependency_table_t copy_dependency_table = dependency_table;
+
 	rename_produced_registers(schedule);
 	
-	rename_operand_registers(schedule, dependency_table);
+	rename_operand_registers(schedule, copy_dependency_table);
 
-	remove_interloop_dependencies(schedule, dependency_table);
+	rename_starting_registers(schedule, copy_dependency_table);
 
-	rename_starting_registers(schedule);
+	remove_interloop_dependencies(schedule, copy_dependency_table);
 }

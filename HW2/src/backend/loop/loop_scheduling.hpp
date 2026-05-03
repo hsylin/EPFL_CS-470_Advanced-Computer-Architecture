@@ -142,5 +142,5 @@ schedule_t encode_schedule(const loop_schedule_result_t& schedule);
 
 loop_schedule_result_t schedule_loop(
 	const std::vector<instruction_t>& program, 
-	dependency_table_t& dependency_table, 
+	const dependency_table_t& dependency_table, 
 	const basic_block_info_t& block_info);

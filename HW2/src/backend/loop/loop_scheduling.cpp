@@ -152,7 +152,7 @@ static bundle_t encode_bundle(std::array<instruction_t, 5> raw_bundle) {
 
 loop_schedule_result_t schedule_loop(
 	const std::vector<instruction_t>& program,
-	dependency_table_t& dependency_table,
+	const dependency_table_t& dependency_table,
 	const basic_block_info_t& block_info)
 {
     std::vector<instruction_t> copy_program = program;
@@ -165,7 +165,7 @@ loop_schedule_result_t schedule_loop(
         int scheduled_slot = 0;
 
         // Find the earliest cycle at which all local dependencies are satisfied
-        for (dependency_t& dependency : dependency_table.entries[i].local_dependencies) {
+        for (const dependency_t& dependency : dependency_table.entries[i].local_dependencies) {
             scheduled_slot = max(scheduled_slot, find_earliest_satisfying_cycle(copy_program, dependency));
         }
 
@@ -184,7 +184,7 @@ loop_schedule_result_t schedule_loop(
             int scheduled_slot = 0;
 
             // Find the earliest cycle at which all local dependencies are satisfied
-            for (dependency_t& dependency : dependency_table.entries[i].local_dependencies) {
+            for (const dependency_t& dependency : dependency_table.entries[i].local_dependencies) {
                 scheduled_slot = max(scheduled_slot, find_earliest_satisfying_cycle(copy_program, dependency));
             }
 
@@ -194,17 +194,19 @@ loop_schedule_result_t schedule_loop(
             initiation_interval = max(initiation_interval, scheduled_slot + 1);
 
             // Find how many empty bundle we must add between bb0 and bb1 to satisfy loop invarient dependencies
-            for (dependency_t& dependency : dependency_table.entries[i].loop_invariant_dependencies) {
+            for (const dependency_t& dependency : dependency_table.entries[i].loop_invariant_dependencies) {
                 bb0_to_bb1_padding = max(
                     bb0_to_bb1_padding,
                     find_earliest_satisfying_cycle(copy_program, dependency) - schedule.size()
                 );
             }
+        }
 
-            // Update the minimum ii such that interloop dependencies are satisfied
-            for (dependency_t& dependency : dependency_table.entries[i].interloop_dependencies) {
+        // Update the minimum ii such that interloop dependencies are satisfied
+        for (int i = block_info.loop_start_address; i < block_info.loop_instruction_address; i++) {
+            for (const dependency_t& dependency : dependency_table.entries[i].interloop_dependencies) {
                 initiation_interval = max(initiation_interval, find_ii_satisfying_interloop(copy_program, dependency));
-                if (dependency.previous_iteration_producer_instruction_address != -1) {
+                if (dependency.producer_instruction_address != -1) {
                     bb0_to_bb1_padding = max(
                         bb0_to_bb1_padding,
                         find_earliest_satisfying_cycle(copy_program, dependency) - schedule.size()
@@ -236,10 +238,10 @@ loop_schedule_result_t schedule_loop(
             int scheduled_slot = 0;
 
             // Find the earliest cycle at which all local and post-loop dependencies are satisfied
-            for (dependency_t& dependency : dependency_table.entries[i].local_dependencies) {
+            for (const dependency_t& dependency : dependency_table.entries[i].local_dependencies) {
                 scheduled_slot = max(scheduled_slot, find_earliest_satisfying_cycle(copy_program, dependency));
             }
-            for (dependency_t& dependency : dependency_table.entries[i].post_loop_dependencies) {
+            for (const dependency_t& dependency : dependency_table.entries[i].post_loop_dependencies) {
                 scheduled_slot = max(scheduled_slot, find_earliest_satisfying_cycle(copy_program, dependency) - schedule.size());
             }
 
