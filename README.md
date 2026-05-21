@@ -17,3 +17,10 @@ This repository contains the implementations of the practical assignments for EP
   2. `looppip.json`: a software-pipelined schedule using the `loop.pip` instruction, rotating registers, rotating predicates, and epilogue control.
 - **Assignment Details**: [Homework 2 - A Cycle-By-Cycle Scheduler for a VLIW Processor](./HW2/documentation/homework2.pdf)
 - **Design Notes**: [Design Notes](./HW2/documentation/design_note.md)
+
+
+## 3. High-Level Synthesis Optimization
+
+- **Objective**: Analyze and optimize five High-Level Synthesis (HLS) kernels under fixed operation latencies and single-port BRAM constraints. The assignment explores loop pipelining, array partitioning, loop-carried dependency analysis, scalar-register rewrites, memory-port constraints, and the performance trade-offs between static and dynamic HLS.
+- **Assignment Details**: [Homework 3 - High-Level Synthesis](./HW3/documentation/homework3.pdf)
+- **Submission**: [Homework 3 Submission](./HW3/submission.pdf)
