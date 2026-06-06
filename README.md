@@ -24,3 +24,12 @@ This repository contains the implementations of the practical assignments for EP
 - **Objective**: Analyze and optimize five High-Level Synthesis (HLS) kernels under fixed operation latencies and single-port BRAM constraints. The assignment explores loop pipelining, array partitioning, loop-carried dependency analysis, scalar-register rewrites, memory-port constraints, and the performance trade-offs between static and dynamic HLS.
 - **Assignment Details**: [Homework 3 - High-Level Synthesis](./HW3/documentation/homework3.pdf)
 - **Submission**: [Homework 3 Submission](./HW3/submission.pdf)
+
+## 4. Spectre Attack
+
+- **Objective**: Implement a Spectre-style cache side-channel attack against a bounds-checked victim function. The attack trains the branch predictor, extends the speculation window by delaying branch resolution, and recovers secret bytes by measuring cache-access timing through a Flush+Reload side channel.
+- **Assignment Details**: [Homework 4 - Spectre](./HW4/documentation/homework4.pdf)
+- **Report**: [Homework 4 Report](./HW4/report.pdf)
+- **Source Code**: [Spectre Attack Implementation](./HW4/spectre.c)
+
+
